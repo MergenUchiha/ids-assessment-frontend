@@ -8,38 +8,87 @@ import {
   Clock,
   Zap
 } from 'lucide-react';
-import StatsCard, { StatsCardProps } from '../components/Dashboard/StatsCard';
+import StatsCard from '../components/Dashboard/StatsCard';
 import AttackVisualization from '../components/Dashboard/AttackVisualization';
 import RecentTests from '../components/Dashboard/RecentTests';
 import LiveFeed from '../components/Dashboard/LiveFeed';
-import { mockDashboardStats, mockTests } from '../utils/mockData';
+import { dashboardAPI, testsAPI } from '../services/api';
 
 const Dashboard = () => {
   const { t } = useTranslation();
-  const [stats, setStats] = useState(mockDashboardStats);
+  const [stats, setStats] = useState<any>(null);
+  const [tests, setTests] = useState<any[]>([]);
   const [activeAttacks, setActiveAttacks] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Simulate real-time updates
+  // Fetch dashboard data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [statsData, testsData] = await Promise.all([
+          dashboardAPI.getStats(),
+          testsAPI.getAll(),
+        ]);
+        
+        setStats(statsData);
+        setTests(testsData.slice(0, 5)); // Latest 5 tests
+        setActiveAttacks(statsData.activeTests || 0);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    
+    // Refresh data every 10 seconds
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Simulate real-time updates for active attacks
   useEffect(() => {
     const interval = setInterval(() => {
-      setStats(prev => ({
-        ...prev,
-        totalAttacks: prev.totalAttacks + Math.floor(Math.random() * 3),
-        detectedAttacks: prev.detectedAttacks + Math.floor(Math.random() * 2),
-      }));
-      
       setActiveAttacks(Math.floor(Math.random() * 5));
     }, 3000);
 
     return () => clearInterval(interval);
   }, []);
 
-  const statsCards: StatsCardProps[] = [
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-cyber-purple border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">{t('common.loading')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertTriangle className="w-16 h-16 text-cyber-red mx-auto mb-4" />
+          <p className="text-gray-900 dark:text-white font-bold mb-2">{t('common.error')}</p>
+          <p className="text-gray-600 dark:text-gray-400">{error || t('common.noData')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const statsCards = [
     {
       title: t('dashboard.totalTests'),
       value: stats.totalTests,
       icon: Activity,
-      color: 'purple',
+      color: 'purple' as const,
       trend: '+12%',
       trendUp: true,
     },
@@ -47,7 +96,7 @@ const Dashboard = () => {
       title: t('dashboard.detectionRate'),
       value: `${stats.detectionRate.toFixed(1)}%`,
       icon: Shield,
-      color: 'green',
+      color: 'green' as const,
       trend: '+5.2%',
       trendUp: true,
     },
@@ -55,7 +104,7 @@ const Dashboard = () => {
       title: t('dashboard.falsePositives'),
       value: `${stats.falsePositiveRate.toFixed(1)}%`,
       icon: AlertTriangle,
-      color: 'yellow',
+      color: 'yellow' as const,
       trend: '-2.1%',
       trendUp: false,
     },
@@ -63,7 +112,7 @@ const Dashboard = () => {
       title: t('dashboard.avgDetectionTime'),
       value: `${stats.avgDetectionTime}ms`,
       icon: Clock,
-      color: 'blue',
+      color: 'blue' as const,
       trend: '-15%',
       trendUp: false,
     },
@@ -103,8 +152,8 @@ const Dashboard = () => {
               <Zap className="w-6 h-6 text-cyber-red animate-pulse" />
             </div>
             <div>
-              <h3 className="text-white font-semibold">{t('dashboard.activeAttacks')}</h3>
-              <p className="text-gray-400 text-sm">
+              <h3 className="text-gray-900 dark:text-white font-semibold">{t('dashboard.activeAttacks')}</h3>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
                 {t('dashboard.activeAttacksMsg', { count: activeAttacks })}
               </p>
             </div>
@@ -126,7 +175,7 @@ const Dashboard = () => {
       </div>
 
       {/* Recent Tests */}
-      <RecentTests tests={mockTests} />
+      {tests.length > 0 && <RecentTests tests={tests} />}
     </div>
   );
 };

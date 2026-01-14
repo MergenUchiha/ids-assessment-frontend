@@ -151,6 +151,8 @@
     "summary": "Сводка",
     "detailed": "Подробный",
     "comparative": "Сравнительный",
+    "detailed": "Подробный",
+    "comparative": "Сравнительный",
     "last30days": "Последние 30 дней",
     "generated": "Создано",
     "testsIncluded": "Включено тестов",

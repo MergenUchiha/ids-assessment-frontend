@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Monitor, Shield, Target, Wifi } from 'lucide-react';
+import { testsAPI } from '../../services/api';
 
 interface AttackPacket {
   id: string;
@@ -17,7 +18,30 @@ const AttackVisualization = () => {
   const [missedCount, setMissedCount] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    // Fetch real-time test results
+    const fetchTestResults = async () => {
+      try {
+        const tests = await testsAPI.getAll();
+        const runningTests = tests.filter(t => t.status === 'running');
+        
+        if (runningTests.length > 0) {
+          // Calculate totals from running tests
+          const totalDetected = runningTests.reduce((sum, test) => sum + test.detectedAttacks, 0);
+          const totalMissed = runningTests.reduce((sum, test) => sum + test.missedAttacks, 0);
+          
+          setDetectionCount(totalDetected);
+          setMissedCount(totalMissed);
+        }
+      } catch (error) {
+        console.error('Error fetching test results:', error);
+      }
+    };
+
+    fetchTestResults();
+    const dataInterval = setInterval(fetchTestResults, 5000);
+
+    // Animate packets
+    const packetInterval = setInterval(() => {
       const detected = Math.random() > 0.2;
       const newPacket: AttackPacket = {
         id: `packet-${Date.now()}`,
@@ -35,7 +59,10 @@ const AttackVisualization = () => {
       }
     }, 2000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(dataInterval);
+      clearInterval(packetInterval);
+    };
   }, []);
 
   return (
@@ -62,8 +89,8 @@ const AttackVisualization = () => {
         {/* Attacker Node */}
         <div className="absolute left-8 top-1/2 -translate-y-1/2">
           <div className="relative">
-            <div className="p-4 bg-cyber-red/20 border-2 border-cyber-red rounded-lg neon-glow">
-              <Monitor className="w-8 h-8 text-cyber-red" />
+            <div className="p-4 bg-red-100 dark:bg-cyber-red/20 border-2 border-red-500 dark:border-cyber-red rounded-lg">
+              <Monitor className="w-8 h-8 text-red-600 dark:text-cyber-red" />
             </div>
             <p className="text-xs text-center mt-2 text-gray-700 dark:text-gray-400 font-medium">{t('dashboard.attacker')}</p>
             <p className="text-xs text-center text-gray-600 dark:text-gray-500">192.168.1.50</p>
@@ -73,20 +100,20 @@ const AttackVisualization = () => {
         {/* IDS Node */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <div className="relative">
-            <div className="p-4 bg-cyber-purple/20 border-2 border-cyber-purple rounded-lg neon-glow animate-pulse-slow">
-              <Shield className="w-8 h-8 text-cyber-purple" />
+            <div className="p-4 bg-purple-100 dark:bg-cyber-purple/20 border-2 border-purple-500 dark:border-cyber-purple rounded-lg animate-pulse-slow">
+              <Shield className="w-8 h-8 text-purple-600 dark:text-cyber-purple" />
             </div>
             <p className="text-xs text-center mt-2 text-gray-700 dark:text-gray-400 font-medium">{t('dashboard.idsSensor')}</p>
             <p className="text-xs text-center text-gray-600 dark:text-gray-500">192.168.1.10</p>
-            <div className="absolute -top-2 -right-2 w-4 h-4 bg-cyber-green rounded-full border-2 border-white dark:border-cyber-dark" />
+            <div className="absolute -top-2 -right-2 w-4 h-4 bg-green-500 dark:bg-cyber-green rounded-full border-2 border-white dark:border-cyber-dark" />
           </div>
         </div>
 
         {/* Target Node */}
         <div className="absolute right-8 top-1/2 -translate-y-1/2">
           <div className="relative">
-            <div className="p-4 bg-cyber-blue/20 border-2 border-cyber-blue rounded-lg neon-glow">
-              <Target className="w-8 h-8 text-cyber-blue" />
+            <div className="p-4 bg-blue-100 dark:bg-cyber-blue/20 border-2 border-blue-500 dark:border-cyber-blue rounded-lg">
+              <Target className="w-8 h-8 text-blue-600 dark:text-cyber-blue" />
             </div>
             <p className="text-xs text-center mt-2 text-gray-700 dark:text-gray-400 font-medium">{t('dashboard.target')}</p>
             <p className="text-xs text-center text-gray-600 dark:text-gray-500">192.168.1.100</p>
@@ -114,8 +141,8 @@ const AttackVisualization = () => {
               }}
             >
               <div className="flex items-center gap-2">
-                <Wifi className={`w-4 h-4 ${packet.detected ? 'text-cyber-green' : 'text-cyber-red'}`} />
-                <div className={`h-1 w-12 ${packet.detected ? 'bg-cyber-green' : 'bg-cyber-red'} rounded-full`} />
+                <Wifi className={`w-4 h-4 ${packet.detected ? 'text-green-600 dark:text-cyber-green' : 'text-red-600 dark:text-cyber-red'}`} />
+                <div className={`h-1 w-12 ${packet.detected ? 'bg-green-600 dark:bg-cyber-green' : 'bg-red-600 dark:bg-cyber-red'} rounded-full`} />
               </div>
             </motion.div>
           ))}
@@ -147,11 +174,11 @@ const AttackVisualization = () => {
       {/* Legend */}
       <div className="mt-4 flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-1 bg-cyber-green rounded" />
+          <div className="w-3 h-1 bg-green-600 dark:bg-cyber-green rounded" />
           <span>{t('dashboard.detected')} Attack</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-1 bg-cyber-red rounded" />
+          <div className="w-3 h-1 bg-red-600 dark:bg-cyber-red rounded" />
           <span>{t('dashboard.missed')} Attack</span>
         </div>
       </div>

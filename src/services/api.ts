@@ -1,87 +1,117 @@
-import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Generic fetch wrapper
+async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+    ...options,
+  });
 
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 10000,
-});
-
-// Request interceptor for logging
-api.interceptors.request.use(
-  (config) => {
-    console.log(`🔵 API Request: ${config.method?.toUpperCase()} ${config.url}`);
-    return config;
-  },
-  (error) => {
-    console.error('❌ API Request Error:', error);
-    return Promise.reject(error);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(error.message || `API Error: ${response.statusText}`);
   }
-);
 
-// Response interceptor for logging
-api.interceptors.response.use(
-  (response) => {
-    console.log(`🟢 API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data);
-    return response;
+  return response.json();
+}
+
+// Scenarios API
+export const scenariosAPI = {
+  getAll: (status?: string) => {
+    const query = status ? `?status=${status}` : '';
+    return fetchAPI<any[]>(`/scenarios${query}`);
   },
-  (error) => {
-    console.error('❌ API Response Error:', error.response?.data || error.message);
-    return Promise.reject(error);
-  }
-);
 
-// ============================================
-// DEVICES API
-// ============================================
-export const devicesApi = {
-  getAll: () => api.get('/devices'),
-  getOne: (id: string) => api.get(`/devices/${id}`),
-  create: (data: any) => api.post('/devices', data),
-  update: (id: string, data: any) => api.put(`/devices/${id}`, data),
-  delete: (id: string) => api.delete(`/devices/${id}`),
-  getVulnerabilities: (id: string) => api.get(`/devices/${id}/vulnerabilities`),
+  getOne: (id: string) => fetchAPI<any>(`/scenarios/${id}`),
+
+  create: (data: any) =>
+    fetchAPI<any>('/scenarios', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: any) =>
+    fetchAPI<any>(`/scenarios/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchAPI<any>(`/scenarios/${id}`, {
+      method: 'DELETE',
+    }),
+
+  run: (id: string) =>
+    fetchAPI<any>(`/scenarios/${id}/run`, {
+      method: 'POST',
+    }),
 };
 
-// ============================================
-// SCANS API
-// ============================================
-export const scansApi = {
-  start: (data: { deviceId: string; type: string }) => api.post('/scans/start', data),
-  stop: (id: string) => api.post(`/scans/${id}/stop`),
-  getAll: () => api.get('/scans'),
-  getOne: (id: string) => api.get(`/scans/${id}`),
+// Tests API
+export const testsAPI = {
+  getAll: () => fetchAPI<any[]>('/tests'),
+
+  getOne: (id: string) => fetchAPI<any>(`/tests/${id}`),
+
+  getResults: (id: string) => fetchAPI<any[]>(`/tests/${id}/results`),
+
+  getRecent: (limit: number = 5) => 
+    fetchAPI<any[]>('/tests').then(tests => 
+      tests
+        .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+        .slice(0, limit)
+    ),
 };
 
-// ============================================
-// VULNERABILITIES API
-// ============================================
-export const vulnerabilitiesApi = {
-  getAll: (params?: { severity?: string; device?: string }) => 
-    api.get('/vulnerabilities', { params }),
-  getOne: (id: string) => api.get(`/vulnerabilities/${id}`),
-  getStats: () => api.get('/vulnerabilities/stats/summary'),
+// Dashboard API
+export const dashboardAPI = {
+  getStats: () => fetchAPI<any>('/dashboard/stats'),
 };
 
-// ============================================
-// REPORTS API
-// ============================================
-export const reportsApi = {
-  generate: (type: 'technical' | 'executive' | 'compliance') => 
-    api.post('/reports/generate', { type }),
-  getAll: () => api.get('/reports'),
+// Lab API
+export const labAPI = {
+  getEnvironments: () => fetchAPI<any[]>('/lab/environments'),
+
+  getIDSConfigs: () => fetchAPI<any[]>('/lab/ids-configs'),
+
+  updateIDSStatus: (id: string, status: string) =>
+    fetchAPI<any>(`/lab/ids-configs/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+
+  updateIDSRules: (id: string, rules: number) =>
+    fetchAPI<any>(`/lab/ids-configs/${id}/rules`, {
+      method: 'PUT',
+      body: JSON.stringify({ rules }),
+    }),
 };
 
-// ============================================
-// ANALYTICS API
-// ============================================
-export const analyticsApi = {
-  getDashboard: () => api.get('/analytics/dashboard'),
-  getMetrics: () => api.get('/analytics/metrics'),
-  getTraffic: () => api.get('/analytics/traffic'),
-  getTrends: () => api.get('/analytics/trends'),
-  getActivity: () => api.get('/analytics/activity'),
+// Reports API
+export const reportsAPI = {
+  getAll: () => fetchAPI<any[]>('/reports'),
+
+  getOne: (id: string) => fetchAPI<any>(`/reports/${id}`),
+
+  generate: (data: any) =>
+    fetchAPI<any>('/reports/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchAPI<any>(`/reports/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+// Health check
+export const healthAPI = {
+  check: () => fetchAPI<{ status: string; timestamp: string }>('/health').catch(() => ({
+    status: 'error',
+    timestamp: new Date().toISOString(),
+  })),
 };

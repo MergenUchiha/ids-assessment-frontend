@@ -7,13 +7,16 @@ export interface AttackScenario {
   targetOS: string;
   targetPort: number;
   createdAt: string;
+  updatedAt: string;
   status: 'draft' | 'ready' | 'running' | 'completed';
+  tests?: Test[];
 }
 
 export interface Test {
   id: string;
   scenarioId: string;
-  scenarioName: string;
+  scenario?: AttackScenario;
+  scenarioName?: string;
   startedAt: string;
   finishedAt?: string;
   status: 'running' | 'completed' | 'failed';
@@ -21,11 +24,13 @@ export interface Test {
   detectedAttacks: number;
   missedAttacks: number;
   falsePositives: number;
+  results?: TestResult[];
 }
 
 export interface TestResult {
   id: string;
   testId: string;
+  test?: Test;
   attackType: string;
   exploitName: string;
   idsDetected: boolean;
@@ -46,6 +51,8 @@ export interface IDSConfiguration {
   rules: number;
   sensitivity: 'low' | 'medium' | 'high';
   status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface LabEnvironment {
@@ -58,6 +65,20 @@ export interface LabEnvironment {
   cpu: number;
   memory: number;
   network: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Report {
+  id: string;
+  name: string;
+  type: 'summary' | 'detailed' | 'comparative';
+  format: 'pdf' | 'csv' | 'json';
+  dateRange: string;
+  testsIncluded: number;
+  fileSize?: string;
+  filePath?: string;
+  createdAt: string;
 }
 
 export interface DashboardStats {

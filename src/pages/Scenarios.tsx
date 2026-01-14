@@ -1,47 +1,72 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react';
+import { Plus, AlertTriangle } from 'lucide-react';
 import ScenarioCard from '../components/Scenarios/ScenarioCard';
 import CreateScenarioModal from '../components/Scenarios/CreateScenarioModal';
-import { mockScenarios } from '../utils/mockData';
+import { scenariosAPI } from '../services/api';
 import { AttackScenario } from '../types';
 
 const Scenarios = () => {
   const { t } = useTranslation();
-  const [scenarios, setScenarios] = useState<AttackScenario[]>(mockScenarios);
+  const [scenarios, setScenarios] = useState<AttackScenario[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredScenarios = filterStatus === 'all' 
-    ? scenarios 
-    : scenarios.filter(s => s.status === filterStatus);
-
-  const handleCreateScenario = (scenario: Omit<AttackScenario, 'id' | 'createdAt'>) => {
-    const newScenario: AttackScenario = {
-      ...scenario,
-      id: `scenario-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-    };
-    setScenarios([...scenarios, newScenario]);
-    setIsModalOpen(false);
+  // Fetch scenarios
+  const fetchScenarios = async () => {
+    try {
+      setLoading(true);
+      const data = await scenariosAPI.getAll(filterStatus === 'all' ? undefined : filterStatus);
+      setScenarios(data);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch scenarios:', err);
+      setError('Failed to load scenarios');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRunScenario = (id: string) => {
-    setScenarios(scenarios.map(s => 
-      s.id === id ? { ...s, status: 'running' as const } : s
-    ));
+  useEffect(() => {
+    fetchScenarios();
+  }, [filterStatus]);
+
+  const filteredScenarios = scenarios;
+
+  const handleCreateScenario = async (scenario: Omit<AttackScenario, 'id' | 'createdAt'>) => {
+    try {
+      await scenariosAPI.create(scenario);
+      setIsModalOpen(false);
+      fetchScenarios();
+    } catch (err) {
+      console.error('Failed to create scenario:', err);
+      alert('Failed to create scenario');
+    }
+  };
+
+  const handleRunScenario = async (id: string) => {
+    try {
+      await scenariosAPI.run(id);
+      fetchScenarios();
+    } catch (err) {
+      console.error('Failed to run scenario:', err);
+      alert('Failed to run scenario');
+    }
+  };
+
+  const handleDeleteScenario = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this scenario?')) return;
     
-    // Simulate test completion
-    setTimeout(() => {
-      setScenarios(prev => prev.map(s => 
-        s.id === id ? { ...s, status: 'completed' as const } : s
-      ));
-    }, 5000);
-  };
-
-  const handleDeleteScenario = (id: string) => {
-    setScenarios(scenarios.filter(s => s.id !== id));
+    try {
+      await scenariosAPI.delete(id);
+      fetchScenarios();
+    } catch (err) {
+      console.error('Failed to delete scenario:', err);
+      alert('Failed to delete scenario');
+    }
   };
 
   const statusCounts = {
@@ -51,6 +76,17 @@ const Scenarios = () => {
     running: scenarios.filter(s => s.status === 'running').length,
     completed: scenarios.filter(s => s.status === 'completed').length,
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-cyber-purple border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">{t('common.loading')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -68,6 +104,16 @@ const Scenarios = () => {
           {t('scenarios.createScenario')}
         </button>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="glass-card p-4 rounded-xl border border-cyber-red/30 bg-cyber-red/10">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-cyber-red" />
+            <p className="text-gray-900 dark:text-white">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="glass-card p-4 rounded-xl border border-gray-200 dark:border-white/10">
@@ -107,7 +153,7 @@ const Scenarios = () => {
         ))}
       </div>
 
-      {filteredScenarios.length === 0 && (
+      {filteredScenarios.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="glass-card p-12 rounded-xl border border-gray-200 dark:border-white/10 inline-block">
             <div className="w-16 h-16 bg-cyber-purple/20 rounded-full flex items-center justify-center mx-auto mb-4">

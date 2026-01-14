@@ -151,6 +151,8 @@
     "summary": "Summary",
     "detailed": "Detailed",
     "comparative": "Comparative",
+    "detailed": "Detailed",
+    "comparative": "Comparative",
     "last30days": "Last 30 days",
     "generated": "Generated",
     "testsIncluded": "Tests Included",
