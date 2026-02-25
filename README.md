@@ -1,228 +1,24 @@
-# IDS Assessment Platform - Frontend
+# IDS Lab — Frontend
 
-Эффектное веб-приложение для оценки эффективности систем обнаружения вторжений (IDS) против Metasploit эксплойтов.
+React + TypeScript + Vite + Tailwind + Recharts
 
-## 🎨 Возможности
-
-- **Real-Time Dashboard** - мониторинг атак и детекций в реальном времени
-- **Attack Scenario Builder** - создание и управление сценариями атак
-- **Advanced Analytics** - графики эффективности IDS, ROC-кривые, heatmaps
-- **Lab Environment Monitor** - мониторинг виртуальных машин и IDS
-- **Report Generator** - генерация отчётов для дипломной работы
-- **Киберпанк дизайн** - тёмная тема с неоновыми эффектами
-
-## 📋 Требования
-
-- **Node.js** версии 18 или выше ([скачать](https://nodejs.org/))
-- **npm** (устанавливается вместе с Node.js)
-
-## 🚀 Установка и запуск
-
-### 1. Клонируйте проект или создайте папку
-
-```bash
-mkdir ids-assessment-platform
-cd ids-assessment-platform
-```
-
-### 2. Установите зависимости
+## Setup
 
 ```bash
 npm install
+npm run dev       # http://localhost:5173
 ```
 
-### 3. Запустите приложение
+## Backend proxy
+Vite proxies `/api/*` → `http://localhost:3000` (configured in `vite.config.ts`)
 
-```bash
-npm run dev
-```
+## Pages
+- `/` Dashboard — KPI cards, runs per experiment chart, alert severity distribution, recent runs
+- `/experiments` Experiments — CRUD + run launcher with scenario selector, runs table
+- `/runs/:id` Run Detail — full report: metrics, TP/FP/FN, radar chart, attack timeline, alerts table
+- `/scenarios` Scenarios — CRUD for Metasploit attack scenarios
+- `/ids-profiles` IDS Profiles — CRUD for Suricata ruleset profiles
+- `/alerts` Alerts — global alert table with search + sort
 
-Приложение запустится на `http://localhost:3000`
-
-## 📁 Структура проекта
-
-```
-frontend/
-├── src/
-│   ├── components/          # React компоненты
-│   │   ├── Dashboard/       # Компоненты главной страницы
-│   │   ├── Scenarios/       # Управление сценариями атак
-│   │   ├── Analytics/       # Графики и аналитика
-│   │   ├── LabMonitor/      # Мониторинг лабораторной среды
-│   │   ├── Reports/         # Генерация отчётов
-│   │   └── Layout/          # Layout и навигация
-│   ├── pages/               # Страницы приложения
-│   ├── types/               # TypeScript типы
-│   ├── utils/               # Утилиты и mock данные
-│   ├── App.tsx              # Главный компонент
-│   ├── main.tsx             # Точка входа
-│   └── index.css            # Глобальные стили
-├── public/                  # Статические файлы
-├── package.json             # Зависимости проекта
-├── tsconfig.json            # Конфигурация TypeScript
-├── vite.config.ts           # Конфигурация Vite
-└── tailwind.config.js       # Конфигурация Tailwind CSS
-```
-
-## 🎯 Основные страницы
-
-### 1. Dashboard (`/`)
-- Real-time визуализация атак
-- Статистика детекций
-- Live feed событий
-- Таблица последних тестов
-
-### 2. Attack Scenarios (`/scenarios`)
-- Создание сценариев атак
-- Управление эксплойтами
-- Запуск тестов
-- Фильтрация по статусу
-
-### 3. Analytics (`/analytics`)
-- Графики Detection Rate
-- ROC-кривые
-- Heatmap по типам эксплойтов
-- Performance метрики
-
-### 4. Lab Monitor (`/lab`)
-- Network topology
-- Мониторинг виртуальных машин
-- Конфигурация IDS
-- Статус ресурсов (CPU, Memory, Network)
-
-### 5. Reports (`/reports`)
-- Генерация PDF отчётов
-- Экспорт в CSV/JSON
-- История отчётов
-- Быстрые экспорты
-
-## 🛠️ Технологии
-
-- **React 18** - UI библиотека
-- **TypeScript** - типизация
-- **Vite** - сборщик и dev server
-- **TailwindCSS** - стилизация
-- **Recharts** - графики и диаграммы
-- **Framer Motion** - анимации
-- **React Router** - маршрутизация
-- **Lucide React** - иконки
-- **date-fns** - работа с датами
-
-## 🎨 Дизайн система
-
-### Цветовая палитра
-
-```css
-cyber-dark: #0a0e27      /* Тёмный фон */
-cyber-darker: #060918    /* Основной фон */
-cyber-purple: #8b5cf6    /* Фиолетовый акцент */
-cyber-blue: #3b82f6      /* Синий */
-cyber-green: #10b981     /* Зелёный (success) */
-cyber-red: #ef4444       /* Красный (danger) */
-cyber-yellow: #f59e0b    /* Жёлтый (warning) */
-```
-
-### Эффекты
-
-- **Glassmorphism** - полупрозрачные карточки с blur эффектом
-- **Neon glow** - свечение для акцентных элементов
-- **Animated gradients** - анимированные градиенты фона
-- **Smooth transitions** - плавные переходы между состояниями
-
-## 📊 Mock данные
-
-Приложение использует mock данные для демонстрации функционала:
-- `mockScenarios` - примеры attack scenarios
-- `mockTests` - результаты тестов
-- `mockResults` - детальные результаты атак
-- `mockIDSConfigs` - конфигурации IDS
-- `mockLabEnvironments` - виртуальные машины
-
-## 🔧 Скрипты
-
-```bash
-npm run dev      # Запуск dev сервера
-npm run build    # Сборка для production
-npm run preview  # Предпросмотр production сборки
-npm run lint     # Проверка кода
-```
-
-## 🌐 Конфигурация сервера
-
-Vite настроен на:
-- **Port**: 3000
-- **Host**: true (доступ из сети)
-- **Open**: false (не открывать браузер автоматически)
-- **strictPort**: false (использовать другой порт если 3000 занят)
-
-## 📝 Интеграция с Backend
-
-Для подключения к реальному backend:
-
-1. Обновите API endpoints в компонентах
-2. Замените mock данные на реальные API вызовы
-3. Добавьте переменные окружения в `.env`:
-
-```env
-VITE_API_URL=http://localhost:3001/api
-```
-
-## 🎓 Использование для дипломной работы
-
-### Скриншоты для диплома:
-- Dashboard с real-time мониторингом
-- Графики эффективности IDS
-- Таблицы с результатами тестов
-- Network topology
-
-### Экспорт данных:
-- PDF отчёты с графиками
-- CSV для статистического анализа
-- JSON для дальнейшей обработки
-
-## 🚀 Следующие шаги
-
-1. **Backend интеграция** - подключите к NestJS API
-2. **Real-time updates** - добавьте WebSocket для live данных
-3. **Аутентификация** - добавьте систему пользователей
-4. **Расширенная аналитика** - больше графиков и метрик
-5. **Экспорт отчётов** - реальная генерация PDF
-
-## 📖 Дополнительная информация
-
-- [React Documentation](https://react.dev/)
-- [Vite Guide](https://vitejs.dev/guide/)
-- [TailwindCSS Docs](https://tailwindcss.com/docs)
-- [Recharts Examples](https://recharts.org/en-US/examples)
-
-## 💡 Советы
-
-- Используйте **React DevTools** для отладки
-- Проверяйте **Network tab** в браузере для API запросов
-- Используйте **Tailwind IntelliSense** в VS Code
-- Настройте **ESLint** для качества кода
-
-## 🐛 Troubleshooting
-
-**Порт 3000 занят?**
-```bash
-# Vite автоматически найдёт свободный порт
-# Или измените port в vite.config.ts
-```
-
-**Ошибки TypeScript?**
-```bash
-npm run build --noEmit  # Проверка типов без сборки
-```
-
-**Проблемы с зависимостями?**
-```bash
-rm -rf node_modules package-lock.json
-npm install
-```
-
----
-
-**Автор**: Дипломный проект  
-**Тема**: Assessing IDS Effectiveness Against Metasploit Exploits  
-**Год**: 2025
+## Auth
+JWT stored in `localStorage`. Login at `/login` (default: admin@test.com / admin123)

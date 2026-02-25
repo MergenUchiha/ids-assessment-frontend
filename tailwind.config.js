@@ -1,33 +1,26 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
-  darkMode: 'class',
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
-      colors: {
-        cyber: {
-          dark: '#0a0e27',
-          darker: '#060918',
-          purple: '#8b5cf6',
-          blue: '#3b82f6',
-          green: '#10b981',
-          red: '#ef4444',
-          yellow: '#f59e0b',
-        }
+      fontFamily: {
+        display: ['"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
+        mono:    ['"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
+        body:    ['"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
       },
-      animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'glow': 'glow 2s ease-in-out infinite alternate',
+      colors: {
+        // Static (non-theme) shades still needed by some tailwind classes
+        'base-950': '#05070d',
+        'accent-green': 'var(--accent-2)',
       },
       keyframes: {
-        glow: {
-          '0%': { boxShadow: '0 0 5px rgba(139, 92, 246, 0.5), 0 0 10px rgba(139, 92, 246, 0.3)' },
-          '100%': { boxShadow: '0 0 10px rgba(139, 92, 246, 0.8), 0 0 20px rgba(139, 92, 246, 0.5)' },
-        }
-      }
+        'fade-in': { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'none' } },
+        'pulse-accent': { '0%,100%': { opacity: '1' }, '50%': { opacity: '0.4' } },
+      },
+      animation: {
+        'fade-in':      'fade-in 0.25s ease-out',
+        'pulse-accent': 'pulse-accent 2s ease-in-out infinite',
+      },
     },
   },
   plugins: [],
