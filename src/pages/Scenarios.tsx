@@ -1,184 +1,125 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { useTranslation } from 'react-i18next';
-import { Plus, AlertTriangle } from 'lucide-react';
-import ScenarioCard from '../components/Scenarios/ScenarioCard';
-import CreateScenarioModal from '../components/Scenarios/CreateScenarioModal';
-import { scenariosAPI } from '../services/api';
-import { AttackScenario } from '../types';
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { scenariosApi } from '../api/client'
+import { Scenario } from '../types'
+import Panel from '../components/Panel'
+import PageHeader from '../components/PageHeader'
+import Btn from '../components/Btn'
+import { useI18n } from '../i18n'
+import { Plus, Trash2, Zap, Terminal } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
 
-const Scenarios = () => {
-  const { t } = useTranslation();
-  const [scenarios, setScenarios] = useState<AttackScenario[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function Scenarios() {
+  const { t } = useI18n()
+  const qc = useQueryClient()
+  const [showCreate, setShowCreate] = useState(false)
+  const [form, setForm] = useState({ name: '', description: '', msfModule: '', payload: '', rport: '', expectedSignatures: '' })
 
-  // Fetch scenarios
-  const fetchScenarios = async () => {
-    try {
-      setLoading(true);
-      const data = await scenariosAPI.getAll(filterStatus === 'all' ? undefined : filterStatus);
-      setScenarios(data);
-      setError(null);
-    } catch (err) {
-      console.error('Failed to fetch scenarios:', err);
-      setError('Failed to load scenarios');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: scenarios = [], isLoading } = useQuery<Scenario[]>({
+    queryKey: ['scenarios'],
+    queryFn: () => scenariosApi.list(),
+  })
 
-  useEffect(() => {
-    fetchScenarios();
-  }, [filterStatus]);
+  const createMut = useMutation({
+    mutationFn: () => scenariosApi.create({
+      name: form.name, description: form.description || undefined,
+      msfModule: form.msfModule, payload: form.payload || undefined,
+      rport: form.rport ? parseInt(form.rport) : undefined,
+      expectedSignatures: form.expectedSignatures ? form.expectedSignatures.split(',').map(s => s.trim()).filter(Boolean) : [],
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['scenarios'] }); setShowCreate(false); setForm({ name: '', description: '', msfModule: '', payload: '', rport: '', expectedSignatures: '' }) },
+  })
 
-  const filteredScenarios = scenarios;
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => scenariosApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['scenarios'] }),
+  })
 
-  const handleCreateScenario = async (scenario: Omit<AttackScenario, 'id' | 'createdAt'>) => {
-    try {
-      await scenariosAPI.create(scenario);
-      setIsModalOpen(false);
-      fetchScenarios();
-    } catch (err) {
-      console.error('Failed to create scenario:', err);
-      alert('Failed to create scenario');
-    }
-  };
-
-  const handleRunScenario = async (id: string) => {
-    try {
-      await scenariosAPI.run(id);
-      fetchScenarios();
-    } catch (err) {
-      console.error('Failed to run scenario:', err);
-      alert('Failed to run scenario');
-    }
-  };
-
-  const handleDeleteScenario = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this scenario?')) return;
-    
-    try {
-      await scenariosAPI.delete(id);
-      fetchScenarios();
-    } catch (err) {
-      console.error('Failed to delete scenario:', err);
-      alert('Failed to delete scenario');
-    }
-  };
-
-  const statusCounts = {
-    all: scenarios.length,
-    draft: scenarios.filter(s => s.status === 'draft').length,
-    ready: scenarios.filter(s => s.status === 'ready').length,
-    running: scenarios.filter(s => s.status === 'running').length,
-    completed: scenarios.filter(s => s.status === 'completed').length,
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-cyber-purple border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">{t('common.loading')}</p>
-        </div>
-      </div>
-    );
-  }
+  const inp = (field: keyof typeof form, placeholder?: string) => (
+    <input
+      value={form[field]} onChange={e => setForm(p => ({ ...p, [field]: e.target.value }))}
+      placeholder={placeholder}
+      className="w-full rounded-lg px-3 py-2 text-sm font-mono focus:outline-none transition-colors"
+      style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-bright)' }}
+    />
+  )
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{t('scenarios.title')}</h1>
-          <p className="text-gray-600 dark:text-gray-400">{t('scenarios.subtitle')}</p>
-        </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-cyber-purple hover:bg-cyber-purple/80 text-white rounded-lg transition-colors neon-glow"
-        >
-          <Plus className="w-5 h-5" />
-          {t('scenarios.createScenario')}
-        </button>
-      </div>
+    <div className="animate-fade-in">
+      <PageHeader title={t('scenarios')} sub="// metasploit attack scenario configurations"
+        actions={<Btn size="sm" onClick={() => setShowCreate(!showCreate)}><Plus size={12} /> {t('newScenario')}</Btn>}
+      />
 
-      {/* Error Message */}
-      {error && (
-        <div className="glass-card p-4 rounded-xl border border-cyber-red/30 bg-cyber-red/10">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-cyber-red" />
-            <p className="text-gray-900 dark:text-white">{error}</p>
+      {showCreate && (
+        <Panel className="mb-5 p-5" style={{ borderColor: 'color-mix(in srgb, var(--accent) 30%, transparent)' }}>
+          <p className="font-mono text-[9px] uppercase tracking-widest mb-4" style={{ color: 'var(--accent)' }}>// configure scenario</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div><label className="font-mono text-[9px] uppercase tracking-wider block mb-1 text-text-dim">{t('name')} *</label>{inp('name','HTTP Version Scan')}</div>
+            <div><label className="font-mono text-[9px] uppercase tracking-wider block mb-1 text-text-dim">{t('description')}</label>{inp('description')}</div>
+            <div><label className="font-mono text-[9px] uppercase tracking-wider block mb-1 text-text-dim">{t('msfModule')} *</label>{inp('msfModule','auxiliary/scanner/http/http_version')}</div>
+            <div><label className="font-mono text-[9px] uppercase tracking-wider block mb-1 text-text-dim">{t('payload')}</label>{inp('payload','windows/x64/meterpreter/reverse_tcp')}</div>
+            <div><label className="font-mono text-[9px] uppercase tracking-wider block mb-1 text-text-dim">{t('rport')}</label>{inp('rport','80')}</div>
+            <div><label className="font-mono text-[9px] uppercase tracking-wider block mb-1 text-text-dim">{t('expectedSigs')}</label>{inp('expectedSignatures', t('sigsHint'))}</div>
           </div>
-        </div>
+          <div className="flex gap-2">
+            <Btn size="sm" onClick={() => createMut.mutate()} disabled={!form.name || !form.msfModule || createMut.isPending}>
+              {createMut.isPending ? t('creating') : t('create')}
+            </Btn>
+            <Btn size="sm" variant="ghost" onClick={() => setShowCreate(false)}>{t('cancel')}</Btn>
+          </div>
+        </Panel>
       )}
 
-      {/* Filters */}
-      <div className="glass-card p-4 rounded-xl border border-gray-200 dark:border-white/10">
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(statusCounts).map(([status, count]) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`px-4 py-2 rounded-lg transition-all ${
-                filterStatus === status
-                  ? 'bg-cyber-purple text-white'
-                  : 'bg-gray-100 dark:bg-cyber-dark/50 text-gray-700 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-cyber-dark'
-              }`}
-            >
-              <span className="capitalize">{t(`common.${status}`)}</span>
-              <span className="ml-2 text-sm opacity-70">({count})</span>
-            </button>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--border)', borderTopColor: 'var(--accent)' }} />
+        </div>
+      ) : scenarios.length === 0 ? (
+        <div className="text-center py-20">
+          <p className="font-mono text-xs text-text-dim mb-3">{t('noScenarios')}</p>
+          <Btn size="sm" onClick={() => setShowCreate(true)}><Plus size={12} /> {t('newScenario')}</Btn>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {scenarios.map(s => (
+            <Panel key={s.id} className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: 'color-mix(in srgb, var(--warn) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--warn) 25%, transparent)' }}>
+                    <Zap size={14} style={{ color: 'var(--warn)' }} />
+                  </div>
+                  <div>
+                    <p className="font-mono text-sm font-bold text-text-bright">{s.name}</p>
+                    <p className="font-mono text-[9px] text-text-dim uppercase tracking-widest">SCENARIO</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { if (confirm(t('deleteScenario'))) deleteMut.mutate(s.id) }}
+                  className="p-1.5 rounded text-text-dim transition-all hover:text-danger"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+              <div className="space-y-2 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                <div className="flex items-start gap-2">
+                  <Terminal size={10} className="mt-0.5 flex-shrink-0 text-text-dim" />
+                  <code className="font-mono text-[10px] break-all" style={{ color: 'var(--accent-2)' }}>{s.msfModule}</code>
+                </div>
+                {s.rport && (
+                  <p className="font-mono text-[9px] text-text-dim">RPORT: <span className="text-text">{s.rport}</span></p>
+                )}
+                {s.expectedSignatures.length > 0 && (
+                  <p className="font-mono text-[9px] text-text-dim">{s.expectedSignatures.length} sig(s)</p>
+                )}
+                <p className="font-mono text-[9px] text-text-dim">
+                  {formatDistanceToNow(new Date(s.createdAt), { addSuffix: true })}
+                </p>
+              </div>
+            </Panel>
           ))}
         </div>
-      </div>
-
-      {/* Scenarios Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredScenarios.map((scenario, index) => (
-          <motion.div
-            key={scenario.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <ScenarioCard
-              scenario={scenario}
-              onRun={handleRunScenario}
-              onDelete={handleDeleteScenario}
-            />
-          </motion.div>
-        ))}
-      </div>
-
-      {filteredScenarios.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <div className="glass-card p-12 rounded-xl border border-gray-200 dark:border-white/10 inline-block">
-            <div className="w-16 h-16 bg-cyber-purple/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Plus className="w-8 h-8 text-cyber-purple" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t('scenarios.noScenarios')}</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">{t('scenarios.createFirst')}</p>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="px-6 py-2 bg-cyber-purple hover:bg-cyber-purple/80 text-white rounded-lg transition-colors"
-            >
-              {t('scenarios.createScenario')}
-            </button>
-          </div>
-        </div>
       )}
-
-      {/* Create Modal */}
-      <CreateScenarioModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onCreate={handleCreateScenario}
-      />
     </div>
-  );
-};
-
-export default Scenarios;
+  )
+}

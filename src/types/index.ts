@@ -1,105 +1,95 @@
-export interface AttackScenario {
+export type RunStatus = 'QUEUED' | 'RUNNING' | 'FINISHED' | 'FAILED';
+
+export interface Metric {
   id: string;
-  name: string;
-  description: string;
-  exploitType: string;
-  targetIP: string;
-  targetOS: string;
-  targetPort: number;
-  createdAt: string;
-  updatedAt: string;
-  status: 'draft' | 'ready' | 'running' | 'completed';
-  tests?: Test[];
+  runId: string;
+  tp: number;
+  fp: number;
+  fn: number;
+  precision: number | null;
+  recall: number | null;
+  f1: number | null;
+  latencyMs: number | null;
 }
 
-export interface Test {
+export interface Alert {
   id: string;
-  scenarioId: string;
-  scenario?: AttackScenario;
-  scenarioName?: string;
-  startedAt: string;
+  runId: string;
+  timestamp: string;
+  signature: string;
+  severity: number;
+  srcIp: string;
+  destIp: string;
+  raw: Record<string, unknown>;
+}
+
+export interface AttackEvent {
+  id: string;
+  runId: string;
+  type: 'attack_start' | 'attack_end' | 'attack_success' | 'attack_fail' | 'error';
+  timestamp: string;
+  data?: Record<string, unknown>;
+}
+
+export interface Scenario {
+  id: string;
+  name: string;
+  description?: string;
+  msfModule: string;
+  payload?: string;
+  rport?: number;
+  expectedSignatures: string[];
+  createdAt: string;
+}
+
+export interface IdsProfile {
+  id: string;
+  name: string;
+  ruleset: string;
+  createdAt: string;
+}
+
+export interface Run {
+  id: string;
+  experimentId: string;
+  scenarioId?: string;
+  idsProfileId?: string;
+  status: RunStatus;
+  startedAt?: string;
   finishedAt?: string;
-  status: 'running' | 'completed' | 'failed';
-  totalAttacks: number;
-  detectedAttacks: number;
-  missedAttacks: number;
-  falsePositives: number;
-  results?: TestResult[];
+  attackSuccess?: boolean;
+  scenario?: Scenario;
+  idsProfile?: IdsProfile;
+  alerts?: Alert[];
+  metrics?: Metric;
+  attackEvents?: AttackEvent[];
 }
 
-export interface TestResult {
-  id: string;
-  testId: string;
-  test?: Test;
-  attackType: string;
-  exploitName: string;
-  idsDetected: boolean;
-  detectionTime?: number;
-  falsePositive: boolean;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  timestamp: string;
-  sourceIP: string;
-  targetIP: string;
-  protocol: string;
-}
-
-export interface IDSConfiguration {
+export interface Experiment {
   id: string;
   name: string;
-  type: 'snort' | 'suricata';
-  version: string;
-  rules: number;
-  sensitivity: 'low' | 'medium' | 'high';
-  status: 'active' | 'inactive';
+  description?: string;
   createdAt: string;
-  updatedAt: string;
+  runs: Run[];
 }
 
-export interface LabEnvironment {
-  id: string;
-  name: string;
-  type: 'attacker' | 'target' | 'ids';
-  ip: string;
-  os: string;
-  status: 'online' | 'offline' | 'busy';
-  cpu: number;
-  memory: number;
-  network: number;
-  createdAt: string;
-  updatedAt: string;
+export interface RunReport {
+  runId: string;
+  experiment: string;
+  scenario?: string;
+  idsProfile?: string;
+  status: RunStatus;
+  attackSuccess?: boolean;
+  metrics?: Metric;
+  alertsCount: number;
+  startedAt?: string;
+  finishedAt?: string;
+  attackEvents: AttackEvent[];
 }
 
-export interface Report {
-  id: string;
-  name: string;
-  type: 'summary' | 'detailed' | 'comparative';
-  format: 'pdf' | 'csv' | 'json';
-  dateRange: string;
-  testsIncluded: number;
-  fileSize?: string;
-  filePath?: string;
-  createdAt: string;
-}
-
-export interface DashboardStats {
-  totalTests: number;
-  activeTests: number;
-  totalAttacks: number;
-  detectedAttacks: number;
-  detectionRate: number;
-  falsePositiveRate: number;
-  avgDetectionTime: number;
-}
-
-export interface ExploitCategory {
-  name: string;
-  count: number;
-  color: string;
-}
-
-export interface TimeSeriesData {
-  timestamp: string;
-  attacks: number;
-  detected: number;
-  missed: number;
+export interface PaginatedAlerts {
+  total: number;
+  page: number;
+  limit: number;
+  data: Alert[];
 }
