@@ -44,7 +44,17 @@ export default function Experiments() {
     const { data: experiments = [], isLoading } = useQuery<Experiment[]>({
         queryKey: ["experiments"],
         queryFn: () => experimentsApi.list(),
+        // Авто-обновление: каждые 3с если есть активные запуски, иначе каждые 15с
+        refetchInterval: (query) => {
+            const data = query.state.data as Experiment[] | undefined;
+            if (!data) return 15_000;
+            const hasActive = data
+                .flatMap((e) => e.runs ?? [])
+                .some((r) => r.status === "RUNNING" || r.status === "QUEUED");
+            return hasActive ? 3_000 : 15_000;
+        },
     });
+
     const { data: scenarios = [] } = useQuery<Scenario[]>({
         queryKey: ["scenarios"],
         queryFn: () => scenariosApi.list(),
@@ -176,6 +186,10 @@ export default function Experiments() {
                     {experiments.map((exp) => {
                         const isOpen = expanded === exp.id;
                         const runs = exp.runs ?? [];
+                        const hasActiveRuns = runs.some(
+                            (r) =>
+                                r.status === "RUNNING" || r.status === "QUEUED",
+                        );
                         return (
                             <Panel key={exp.id}>
                                 {/* Header */}
@@ -212,6 +226,22 @@ export default function Experiments() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-4 flex-shrink-0">
+                                        {/* Индикатор активного запуска */}
+                                        {hasActiveRuns && (
+                                            <span
+                                                className="flex items-center gap-1.5 font-mono text-xs"
+                                                style={{ color: "var(--warn)" }}
+                                            >
+                                                <span
+                                                    className="w-2 h-2 rounded-full animate-pulse"
+                                                    style={{
+                                                        background:
+                                                            "var(--warn)",
+                                                    }}
+                                                />
+                                                live
+                                            </span>
+                                        )}
                                         <span className="font-mono text-sm text-text-dim">
                                             {runs.length} {t("runs")}
                                         </span>
