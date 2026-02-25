@@ -10,8 +10,8 @@ export default function PageHeader({ title, sub, actions }: Props) {
   return (
     <div className="flex items-center justify-between mb-6">
       <div>
-        <h1 className="font-mono font-bold text-xl uppercase tracking-widest text-text-bright">{title}</h1>
-        {sub && <p className="font-mono text-[10px] text-text-dim mt-0.5 tracking-wider">{sub}</p>}
+        <h1 className="font-mono font-bold text-2xl uppercase tracking-widest text-text-bright">{title}</h1>
+        {sub && <p className="font-mono text-sm text-text-dim mt-1 tracking-wide">{sub}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
