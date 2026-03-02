@@ -21,6 +21,29 @@ const inputSt: React.CSSProperties = {
     fontFamily: "inherit",
 };
 
+interface FieldProps {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+}
+
+function Field({ label, value, onChange, placeholder }: FieldProps) {
+    return (
+        <div>
+            <label className="font-mono text-xs uppercase tracking-wider block mb-1.5 text-text-dim">
+                {label}
+            </label>
+            <input
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                style={inputSt}
+            />
+        </div>
+    );
+}
+
 export default function Scenarios() {
     const { t } = useI18n();
     const qc = useQueryClient();
@@ -73,29 +96,8 @@ export default function Scenarios() {
         onSuccess: () => qc.invalidateQueries({ queryKey: ["scenarios"] }),
     });
 
-    const Field = ({
-        label,
-        field,
-        placeholder,
-    }: {
-        label: string;
-        field: keyof typeof form;
-        placeholder?: string;
-    }) => (
-        <div>
-            <label className="font-mono text-xs uppercase tracking-wider block mb-1.5 text-text-dim">
-                {label}
-            </label>
-            <input
-                value={form[field]}
-                onChange={(e) =>
-                    setForm((p) => ({ ...p, [field]: e.target.value }))
-                }
-                placeholder={placeholder}
-                style={inputSt}
-            />
-        </div>
-    );
+    const setField = (key: keyof typeof form) => (value: string) =>
+        setForm((p) => ({ ...p, [key]: value }));
 
     return (
         <div className="animate-fade-in">
@@ -126,28 +128,37 @@ export default function Scenarios() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                         <Field
                             label={`${t("name")} *`}
-                            field="name"
+                            value={form.name}
+                            onChange={setField("name")}
                             placeholder="HTTP Version Scan"
                         />
-                        <Field label={t("description")} field="description" />
+                        <Field
+                            label={t("description")}
+                            value={form.description}
+                            onChange={setField("description")}
+                        />
                         <Field
                             label={`${t("msfModule")} *`}
-                            field="msfModule"
+                            value={form.msfModule}
+                            onChange={setField("msfModule")}
                             placeholder="auxiliary/scanner/http/http_version"
                         />
                         <Field
                             label={t("payload")}
-                            field="payload"
+                            value={form.payload}
+                            onChange={setField("payload")}
                             placeholder="windows/x64/meterpreter/reverse_tcp"
                         />
                         <Field
                             label={t("rport")}
-                            field="rport"
+                            value={form.rport}
+                            onChange={setField("rport")}
                             placeholder="80"
                         />
                         <Field
                             label={t("expectedSigs")}
-                            field="expectedSignatures"
+                            value={form.expectedSignatures}
+                            onChange={setField("expectedSignatures")}
                             placeholder={t("sigsHint")}
                         />
                     </div>
