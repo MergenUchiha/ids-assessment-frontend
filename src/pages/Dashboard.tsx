@@ -99,6 +99,7 @@ export default function Dashboard() {
     const finished = allRuns.filter((r) => r.status === "FINISHED");
     const successes = finished.filter((r) => r.attackSuccess);
     const withMetrics = finished.filter((r) => r.metrics);
+
     const avgF1 = withMetrics.length
         ? withMetrics.reduce((s, r) => s + (r.metrics!.f1 ?? 0), 0) /
           withMetrics.length
@@ -112,12 +113,14 @@ export default function Dashboard() {
         value,
     }));
 
-    const metricsTimeline = withMetrics.map((r, i) => ({
-        name: `R${i + 1}`,
-        Precision: +((r.metrics!.precision ?? 0) * 100).toFixed(1),
-        Recall: +((r.metrics!.recall ?? 0) * 100).toFixed(1),
-        F1: +((r.metrics!.f1 ?? 0) * 100).toFixed(1),
-    }));
+    const metricsTimeline = withMetrics
+        .map((r, i) => ({
+            name: `R${i + 1}`,
+            Precision: +((r.metrics!.precision ?? 0) * 100).toFixed(1),
+            Recall: +((r.metrics!.recall ?? 0) * 100).toFixed(1),
+            F1: +((r.metrics!.f1 ?? 0) * 100).toFixed(1),
+        }))
+        .filter((d) => d.F1 > 0 || d.Precision > 0);
 
     const sigCount: Record<string, number> = {};
     for (const a of alerts)
