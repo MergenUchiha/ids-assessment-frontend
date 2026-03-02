@@ -44,7 +44,6 @@ export default function Experiments() {
     const { data: experiments = [], isLoading } = useQuery<Experiment[]>({
         queryKey: ["experiments"],
         queryFn: () => experimentsApi.list(),
-        // Авто-обновление: каждые 3с если есть активные запуски, иначе каждые 15с
         refetchInterval: (query) => {
             const data = query.state.data as Experiment[] | undefined;
             if (!data) return 15_000;
@@ -82,9 +81,15 @@ export default function Experiments() {
     const runMut = useMutation({
         mutationFn: ({ expId, scId }: { expId: string; scId: string }) =>
             runsApi.create(expId, scId),
-        onSuccess: () => {
+        onSuccess: (_, variables) => {
             qc.invalidateQueries({ queryKey: ["experiments"] });
             qc.invalidateQueries({ queryKey: ["experiments-dashboard"] });
+            // Сбрасываем выбор сценария после запуска
+            setSelectedScenario((prev) => {
+                const next = { ...prev };
+                delete next[variables.expId];
+                return next;
+            });
         },
     });
 
@@ -122,6 +127,12 @@ export default function Experiments() {
                             <input
                                 value={newName}
                                 onChange={(e) => setNewName(e.target.value)}
+                                onKeyDown={(e) =>
+                                    e.key === "Enter" &&
+                                    newName &&
+                                    !createMut.isPending &&
+                                    createMut.mutate()
+                                }
                                 style={inputStyle}
                                 placeholder="Baseline Experiment"
                             />
@@ -149,7 +160,11 @@ export default function Experiments() {
                         <Btn
                             size="sm"
                             variant="ghost"
-                            onClick={() => setShowCreate(false)}
+                            onClick={() => {
+                                setShowCreate(false);
+                                setNewName("");
+                                setNewDesc("");
+                            }}
                         >
                             {t("cancel")}
                         </Btn>
@@ -190,9 +205,10 @@ export default function Experiments() {
                             (r) =>
                                 r.status === "RUNNING" || r.status === "QUEUED",
                         );
+
                         return (
                             <Panel key={exp.id}>
-                                {/* Header */}
+                                {/* ── Заголовок ── */}
                                 <div
                                     className="flex items-center gap-3 px-5 py-4 cursor-pointer rounded-t-xl transition-colors"
                                     style={{
@@ -220,13 +236,12 @@ export default function Experiments() {
                                             {exp.name}
                                         </p>
                                         {exp.description && (
-                                            <p className="font-mono text-sm text-text-dim mt-0.5">
+                                            <p className="font-mono text-sm text-text-dim mt-0.5 truncate">
                                                 {exp.description}
                                             </p>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-4 flex-shrink-0">
-                                        {/* Индикатор активного запуска */}
                                         {hasActiveRuns && (
                                             <span
                                                 className="flex items-center gap-1.5 font-mono text-xs"
@@ -245,7 +260,7 @@ export default function Experiments() {
                                         <span className="font-mono text-sm text-text-dim">
                                             {runs.length} {t("runs")}
                                         </span>
-                                        <span className="font-mono text-sm text-text-dim">
+                                        <span className="font-mono text-sm text-text-dim hidden sm:block">
                                             {formatDistanceToNow(
                                                 new Date(exp.createdAt),
                                                 { addSuffix: true },
@@ -262,12 +277,14 @@ export default function Experiments() {
                                                     deleteMut.mutate(exp.id);
                                             }}
                                             className="p-1.5 rounded transition-all text-text-dim hover:text-danger"
+                                            title="Delete experiment"
                                         >
                                             <Trash2 size={14} />
                                         </button>
                                     </div>
                                 </div>
 
+                                {/* ── Развёрнутое содержимое ── */}
                                 {isOpen && (
                                     <div
                                         style={{
@@ -275,7 +292,7 @@ export default function Experiments() {
                                                 "1px solid var(--border)",
                                         }}
                                     >
-                                        {/* Run launcher */}
+                                        {/* Запуск run */}
                                         <div
                                             className="px-5 py-4 flex items-end gap-3"
                                             style={{
@@ -305,7 +322,7 @@ export default function Experiments() {
                                                             }),
                                                         )
                                                     }
-                                                    style={{ ...inputStyle }}
+                                                    style={inputStyle}
                                                 >
                                                     <option value="">
                                                         — {t("selectScenario")}{" "}
@@ -342,6 +359,7 @@ export default function Experiments() {
                                             </Btn>
                                         </div>
 
+                                        {/* Таблица runs */}
                                         {runs.length === 0 ? (
                                             <p className="font-mono text-sm text-text-dim text-center py-8">
                                                 {t("noRunsYet")}
@@ -358,6 +376,7 @@ export default function Experiments() {
                                                         >
                                                             {[
                                                                 t("runId"),
+                                                                t("scenario"),
                                                                 t("status"),
                                                                 t("attack"),
                                                                 t("started"),
@@ -387,6 +406,7 @@ export default function Experiments() {
                                                                     ).getTime(),
                                                             )
                                                             .map((run) => {
+                                                                // ← dur вычисляем здесь, внутри map callback
                                                                 const dur =
                                                                     run.startedAt &&
                                                                     run.finishedAt
@@ -400,7 +420,9 @@ export default function Experiments() {
                                                                                   1000,
                                                                           )
                                                                         : null;
+
                                                                 return (
+                                                                    // ← return содержит ВЕСЬ tr включая td scenario
                                                                     <tr
                                                                         key={
                                                                             run.id
@@ -410,6 +432,7 @@ export default function Experiments() {
                                                                                 "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
                                                                         }}
                                                                     >
+                                                                        {/* Run ID */}
                                                                         <td className="px-5 py-3 font-mono text-sm text-text-dim">
                                                                             {run.id.slice(
                                                                                 0,
@@ -417,6 +440,25 @@ export default function Experiments() {
                                                                             )}
                                                                             …
                                                                         </td>
+
+                                                                        {/* ✅ Scenario — правильно внутри return */}
+                                                                        <td className="px-5 py-3 font-mono text-sm text-text max-w-[140px]">
+                                                                            <span
+                                                                                className="truncate block"
+                                                                                title={
+                                                                                    run
+                                                                                        .scenario
+                                                                                        ?.name
+                                                                                }
+                                                                            >
+                                                                                {run
+                                                                                    .scenario
+                                                                                    ?.name ??
+                                                                                    "—"}
+                                                                            </span>
+                                                                        </td>
+
+                                                                        {/* Status */}
                                                                         <td className="px-5 py-3">
                                                                             <StatusBadge
                                                                                 status={
@@ -424,6 +466,8 @@ export default function Experiments() {
                                                                                 }
                                                                             />
                                                                         </td>
+
+                                                                        {/* Attack success */}
                                                                         <td className="px-5 py-3 font-mono text-sm">
                                                                             {run.attackSuccess ===
                                                                             true ? (
@@ -451,6 +495,8 @@ export default function Experiments() {
                                                                                 </span>
                                                                             )}
                                                                         </td>
+
+                                                                        {/* Started */}
                                                                         <td className="px-5 py-3 font-mono text-sm text-text-dim">
                                                                             {run.startedAt
                                                                                 ? formatDistanceToNow(
@@ -463,12 +509,16 @@ export default function Experiments() {
                                                                                   )
                                                                                 : "—"}
                                                                         </td>
+
+                                                                        {/* Duration */}
                                                                         <td className="px-5 py-3 font-mono text-sm text-text-dim">
                                                                             {dur !==
                                                                             null
                                                                                 ? `${dur}s`
                                                                                 : "—"}
                                                                         </td>
+
+                                                                        {/* Report link */}
                                                                         <td className="px-5 py-3">
                                                                             <Link
                                                                                 to={`/runs/${run.id}`}

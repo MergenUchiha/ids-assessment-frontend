@@ -16,6 +16,7 @@ import {
     AlertTriangle,
     ChevronLeft,
     ChevronRight,
+    Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -30,11 +31,72 @@ import { useState } from "react";
 
 const ALERTS_PER_PAGE = 50;
 
+// ── Severity helpers ──────────────────────────────────────────────────────────
+const sevColor = (s: number) =>
+    s === 1 ? "var(--danger)" : s === 2 ? "var(--warn)" : "var(--accent-2)";
+
+const sevLabel = (s: number) => (s === 1 ? "HIGH" : s === 2 ? "MED" : "LOW");
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+function InfoCard({
+    label,
+    value,
+    icon,
+}: {
+    label: string;
+    value: string;
+    icon: React.ReactNode;
+}) {
+    return (
+        <Panel className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+                <span className="text-text-dim">{icon}</span>
+                <p className="font-mono text-xs uppercase tracking-widest text-text-dim">
+                    {label}
+                </p>
+            </div>
+            <p
+                className="font-mono text-base text-text-bright truncate"
+                title={value}
+            >
+                {value}
+            </p>
+        </Panel>
+    );
+}
+
+function MetricRow({
+    label,
+    value,
+    color,
+}: {
+    label: string;
+    value: string;
+    color: string;
+}) {
+    return (
+        <div
+            className="flex items-center justify-between py-2.5"
+            style={{
+                borderBottom:
+                    "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
+            }}
+        >
+            <span className="font-mono text-sm text-text-dim">{label}</span>
+            <span className="font-mono text-base font-bold" style={{ color }}>
+                {value}
+            </span>
+        </div>
+    );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export default function RunDetail() {
     const { runId } = useParams<{ runId: string }>();
     const { t } = useI18n();
     const [alertPage, setAlertPage] = useState(1);
 
+    // Основной запрос — report с метриками и attack events
     const {
         data: report,
         isLoading,
@@ -44,19 +106,23 @@ export default function RunDetail() {
         queryFn: () => runsApi.report(runId!),
         refetchInterval: (q) => {
             const s = q.state.data?.status;
-            return s === "RUNNING" || s === "QUEUED" ? 3000 : false;
+            // Пока run активен — поллим каждые 3 секунды
+            return s === "RUNNING" || s === "QUEUED" ? 3_000 : false;
         },
         enabled: !!runId,
     });
 
-    // GET /runs/:runId/alerts?page=N&limit=50
+    // Алерты — запрашиваем только для завершённых runs
     const { data: alertsData } = useQuery<PaginatedAlerts>({
         queryKey: ["run-alerts", runId, alertPage],
         queryFn: () => runsApi.alerts(runId!, alertPage, ALERTS_PER_PAGE),
-        enabled: !!report && report.status === "FINISHED",
-    });
+        // Показываем алерты и для FAILED — там тоже могут быть
+        enabled: !!report && report.status !== "QUEUED",
+        keepPreviousData: true,
+    } as any);
 
-    if (isLoading)
+    // ── Loading state ─────────────────────────────────────────────────────────
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center py-20 animate-fade-in">
                 <div className="text-center">
@@ -73,8 +139,10 @@ export default function RunDetail() {
                 </div>
             </div>
         );
+    }
 
-    if (error || !report)
+    // ── Error / Not found ─────────────────────────────────────────────────────
+    if (error || !report) {
         return (
             <div className="flex items-center justify-center py-20 animate-fade-in">
                 <div className="text-center">
@@ -84,23 +152,24 @@ export default function RunDetail() {
                         style={{ color: "var(--danger)" }}
                     />
                     <p
-                        className="font-mono text-base"
+                        className="font-mono text-base mb-2"
                         style={{ color: "var(--danger)" }}
                     >
                         {t("runNotFound")}
                     </p>
                     <Link
                         to="/experiments"
-                        className="font-mono text-sm text-text-dim hover:text-accent mt-2 block transition-colors"
+                        className="font-mono text-sm text-text-dim hover:text-accent transition-colors"
                     >
                         ← {t("backToExp")}
                     </Link>
                 </div>
             </div>
         );
+    }
 
+    // ── Derived data ──────────────────────────────────────────────────────────
     const m = report.metrics;
-    const attackEvents = report.attackEvents ?? [];
 
     const radarData = m
         ? [
@@ -122,21 +191,35 @@ export default function RunDetail() {
               )
             : null;
 
+    const attackEvents = report.attackEvents ?? [];
+
     const evColor = (type: string) => {
-        if (type === "attack_success") return "var(--danger)";
-        if (type === "attack_fail") return "var(--accent-2)";
-        if (type === "attack_start") return "var(--accent)";
-        if (type === "attack_end") return "var(--warn)";
-        if (type === "error") return "var(--danger)";
-        return "var(--muted)";
+        switch (type) {
+            case "attack_success":
+                return "var(--danger)";
+            case "attack_fail":
+                return "var(--accent-2)";
+            case "attack_start":
+                return "var(--accent)";
+            case "attack_end":
+                return "var(--warn)";
+            case "error":
+                return "var(--danger)";
+            default:
+                return "var(--muted)";
+        }
     };
 
     const totalAlertPages = alertsData
         ? Math.ceil(alertsData.total / ALERTS_PER_PAGE)
         : 0;
 
+    const isActive = report.status === "RUNNING" || report.status === "QUEUED";
+
+    // ── Render ────────────────────────────────────────────────────────────────
     return (
         <div className="animate-fade-in">
+            {/* Back link + header */}
             <div className="mb-5">
                 <Link
                     to="/experiments"
@@ -151,47 +234,70 @@ export default function RunDetail() {
                 />
             </div>
 
-            {/* Info cards */}
+            {/* ── Active run banner ── */}
+            {isActive && (
+                <div
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl mb-5"
+                    style={{
+                        background:
+                            "color-mix(in srgb, var(--warn) 10%, transparent)",
+                        border: "1px solid color-mix(in srgb, var(--warn) 25%, transparent)",
+                    }}
+                >
+                    <Loader2
+                        size={16}
+                        className="animate-spin flex-shrink-0"
+                        style={{ color: "var(--warn)" }}
+                    />
+                    <p
+                        className="font-mono text-sm"
+                        style={{ color: "var(--warn)" }}
+                    >
+                        {report.status === "RUNNING"
+                            ? "Attack simulation in progress… auto-refreshing every 3s"
+                            : "Run is queued, waiting for runner to pick it up…"}
+                    </p>
+                </div>
+            )}
+
+            {/* ── Info cards: scenario / profile / time ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-                {[
-                    {
-                        label: t("scenario"),
-                        value: report.scenario ?? "—",
-                        icon: <Target size={14} />,
-                    },
-                    {
-                        label: t("idsProfile"),
-                        value: report.idsProfile ?? "default",
-                        icon: <Shield size={14} />,
-                    },
-                    {
-                        label: t("started"),
-                        value: report.startedAt
-                            ? format(new Date(report.startedAt), "HH:mm:ss")
-                            : "—",
-                        icon: <Clock size={14} />,
-                    },
-                    {
-                        label: t("duration"),
-                        value: duration !== null ? `${duration}s` : "—",
-                        icon: <Clock size={14} />,
-                    },
-                ].map(({ label, value, icon }) => (
-                    <Panel key={label} className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-text-dim">{icon}</span>
-                            <p className="font-mono text-xs uppercase tracking-widest text-text-dim">
-                                {label}
-                            </p>
-                        </div>
-                        <p className="font-mono text-base text-text-bright">
-                            {value}
-                        </p>
-                    </Panel>
-                ))}
+                <InfoCard
+                    label={t("scenario")}
+                    value={report.scenario ?? "—"}
+                    icon={<Target size={14} />}
+                />
+                <InfoCard
+                    label={t("idsProfile")}
+                    value={report.idsProfile ?? "default"}
+                    icon={<Shield size={14} />}
+                />
+                <InfoCard
+                    label={t("started")}
+                    value={
+                        report.startedAt
+                            ? format(
+                                  new Date(report.startedAt),
+                                  "HH:mm:ss dd/MM",
+                              )
+                            : "—"
+                    }
+                    icon={<Clock size={14} />}
+                />
+                <InfoCard
+                    label={t("duration")}
+                    value={
+                        duration !== null
+                            ? `${duration}s`
+                            : isActive
+                              ? "running…"
+                              : "—"
+                    }
+                    icon={<Clock size={14} />}
+                />
             </div>
 
-            {/* Quick stats */}
+            {/* ── Quick stats ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                 <Panel className="p-4">
                     <p className="font-mono text-xs uppercase tracking-widest text-text-dim mb-2">
@@ -204,7 +310,8 @@ export default function RunDetail() {
                         {report.alertsCount}
                     </p>
                 </Panel>
-                {m && (
+
+                {m ? (
                     <>
                         <Panel className="p-4">
                             <p className="font-mono text-xs uppercase tracking-widest text-text-dim mb-2">
@@ -249,10 +356,22 @@ export default function RunDetail() {
                             </p>
                         </Panel>
                     </>
+                ) : (
+                    // Заглушки пока нет метрик
+                    Array.from({ length: 3 }).map((_, i) => (
+                        <Panel key={i} className="p-4">
+                            <p className="font-mono text-xs uppercase tracking-widest text-text-dim mb-2">
+                                —
+                            </p>
+                            <p className="font-mono text-3xl font-bold text-text-dim">
+                                —
+                            </p>
+                        </Panel>
+                    ))
                 )}
             </div>
 
-            {/* Attack banner */}
+            {/* ── Attack result banner ── */}
             {report.attackSuccess != null && (
                 <div
                     className="flex items-center gap-3 px-4 py-3 rounded-xl mb-5"
@@ -291,87 +410,80 @@ export default function RunDetail() {
                 </div>
             )}
 
-            {/* 3 columns: metrics / radar / timeline */}
+            {/* ── Metrics / Radar / Timeline ── */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
-                {m && (
+                {/* Detection metrics table */}
+                {m ? (
                     <Panel className="p-5">
                         <p className="font-mono text-sm uppercase tracking-widest text-text-dim mb-4">
                             // {t("detectionMetricsFull")}
                         </p>
                         <div>
-                            {[
-                                {
-                                    label: t("truePositives"),
-                                    value: m.tp,
-                                    color: "var(--accent-2)",
-                                },
-                                {
-                                    label: t("falsePositives"),
-                                    value: m.fp,
-                                    color: "var(--warn)",
-                                },
-                                {
-                                    label: t("falseNegatives"),
-                                    value: m.fn,
-                                    color: "var(--danger)",
-                                },
-                                {
-                                    label: t("precision"),
-                                    value:
-                                        m.precision != null
-                                            ? `${(m.precision * 100).toFixed(1)}%`
-                                            : "—",
-                                    color: "var(--accent)",
-                                },
-                                {
-                                    label: t("recall"),
-                                    value:
-                                        m.recall != null
-                                            ? `${(m.recall * 100).toFixed(1)}%`
-                                            : "—",
-                                    color: "var(--accent)",
-                                },
-                                {
-                                    label: t("f1Score"),
-                                    value:
-                                        m.f1 != null
-                                            ? `${(m.f1 * 100).toFixed(1)}%`
-                                            : "—",
-                                    color: "var(--accent)",
-                                },
-                                {
-                                    label: t("detectionLatency"),
-                                    value:
-                                        m.latencyMs != null
-                                            ? `${m.latencyMs}ms`
-                                            : "—",
-                                    color: "var(--warn)",
-                                },
-                            ].map(({ label, value, color }) => (
-                                <div
-                                    key={label}
-                                    className="flex items-center justify-between py-2.5"
-                                    style={{
-                                        borderBottom:
-                                            "1px solid color-mix(in srgb, var(--border) 50%, transparent)",
-                                    }}
-                                >
-                                    <span className="font-mono text-sm text-text-dim">
-                                        {label}
-                                    </span>
-                                    <span
-                                        className="font-mono text-base font-bold"
-                                        style={{ color }}
-                                    >
-                                        {value}
-                                    </span>
-                                </div>
-                            ))}
+                            <MetricRow
+                                label={t("truePositives")}
+                                value={String(m.tp)}
+                                color="var(--accent-2)"
+                            />
+                            <MetricRow
+                                label={t("falsePositives")}
+                                value={String(m.fp)}
+                                color="var(--warn)"
+                            />
+                            <MetricRow
+                                label={t("falseNegatives")}
+                                value={String(m.fn)}
+                                color="var(--danger)"
+                            />
+                            <MetricRow
+                                label={t("precision")}
+                                value={
+                                    m.precision != null
+                                        ? `${(m.precision * 100).toFixed(1)}%`
+                                        : "—"
+                                }
+                                color="var(--accent)"
+                            />
+                            <MetricRow
+                                label={t("recall")}
+                                value={
+                                    m.recall != null
+                                        ? `${(m.recall * 100).toFixed(1)}%`
+                                        : "—"
+                                }
+                                color="var(--accent)"
+                            />
+                            <MetricRow
+                                label={t("f1Score")}
+                                value={
+                                    m.f1 != null
+                                        ? `${(m.f1 * 100).toFixed(1)}%`
+                                        : "—"
+                                }
+                                color="var(--accent)"
+                            />
+                            <MetricRow
+                                label={t("detectionLatency")}
+                                value={
+                                    m.latencyMs != null
+                                        ? `${m.latencyMs}ms`
+                                        : "—"
+                                }
+                                color="var(--warn)"
+                            />
                         </div>
+                    </Panel>
+                ) : (
+                    <Panel className="p-5 flex items-center justify-center">
+                        <p className="font-mono text-sm text-text-dim text-center">
+                            {isActive
+                                ? "Metrics will appear after run completes"
+                                : "No metrics available"}
+                        </p>
                     </Panel>
                 )}
 
-                {radarData.length > 0 && (
+                {/* Radar chart */}
+                {radarData.length > 0 ? (
                     <Panel className="p-5">
                         <p className="font-mono text-sm uppercase tracking-widest text-text-dim mb-3">
                             // {t("performanceRadar")}
@@ -395,7 +507,7 @@ export default function RunDetail() {
                                     strokeWidth={2}
                                 />
                                 <Tooltip
-                                    formatter={(v: any) => `${v}%`}
+                                    formatter={(v: any) => [`${v}%`, ""]}
                                     contentStyle={{
                                         background: "var(--bg-2)",
                                         border: "1px solid var(--border)",
@@ -406,18 +518,29 @@ export default function RunDetail() {
                             </RadarChart>
                         </ResponsiveContainer>
                     </Panel>
+                ) : (
+                    <Panel className="p-5 flex items-center justify-center">
+                        <p className="font-mono text-sm text-text-dim text-center">
+                            {isActive
+                                ? "Radar will appear after run completes"
+                                : "No metrics for radar"}
+                        </p>
+                    </Panel>
                 )}
 
+                {/* Attack timeline */}
                 <Panel className="p-5">
                     <p className="font-mono text-sm uppercase tracking-widest text-text-dim mb-4">
                         // {t("attackTimeline")}
                     </p>
                     {attackEvents.length === 0 ? (
                         <p className="font-mono text-sm text-text-dim text-center py-8">
-                            No events recorded
+                            {isActive
+                                ? "Waiting for events…"
+                                : "No events recorded"}
                         </p>
                     ) : (
-                        <div className="space-y-1">
+                        <div className="space-y-0">
                             {attackEvents.map((ev, i) => (
                                 <div
                                     key={ev.id}
@@ -432,15 +555,18 @@ export default function RunDetail() {
                                         />
                                         {i < attackEvents.length - 1 && (
                                             <div
-                                                className="w-px min-h-6 mt-1"
+                                                className="w-px flex-1 min-h-[20px] mt-1"
                                                 style={{
                                                     background: "var(--border)",
                                                 }}
                                             />
                                         )}
                                     </div>
-                                    <div className="pb-3 min-w-0">
-                                        <p className="font-mono text-sm font-medium text-text">
+                                    <div className="pb-3 min-w-0 flex-1">
+                                        <p
+                                            className="font-mono text-sm font-medium"
+                                            style={{ color: evColor(ev.type) }}
+                                        >
                                             {ev.type
                                                 .replace(/_/g, " ")
                                                 .toUpperCase()}
@@ -455,7 +581,7 @@ export default function RunDetail() {
                                             "snippet" in ev.data &&
                                             !!ev.data.snippet && (
                                                 <p
-                                                    className="font-mono text-xs text-text-dim mt-0.5 truncate max-w-[200px]"
+                                                    className="font-mono text-xs text-text-dim mt-0.5 truncate"
                                                     title={String(
                                                         ev.data.snippet,
                                                     )}
@@ -469,7 +595,7 @@ export default function RunDetail() {
                                             "message" in ev.data &&
                                             !!ev.data.message && (
                                                 <p
-                                                    className="font-mono text-xs mt-0.5 truncate max-w-[200px]"
+                                                    className="font-mono text-xs mt-0.5 truncate"
                                                     style={{
                                                         color: "var(--danger)",
                                                     }}
@@ -485,16 +611,21 @@ export default function RunDetail() {
                 </Panel>
             </div>
 
-            {/* Alerts table + pagination */}
-            {alertsData && (
+            {/* ── Alerts table ── */}
+            {/* Показываем если есть данные ИЛИ run завершён */}
+            {(alertsData || report.status === "FINISHED") && (
                 <Panel>
                     <div
                         className="px-5 py-3 flex items-center justify-between"
                         style={{ borderBottom: "1px solid var(--border)" }}
                     >
                         <p className="font-mono text-sm uppercase tracking-widest text-text-dim">
-                            // {t("capturedAlerts")} · {alertsData.total}{" "}
-                            {t("total")}
+                            // {t("capturedAlerts")}
+                            {alertsData && (
+                                <span className="ml-2 text-text-dim">
+                                    · {alertsData.total} {t("total")}
+                                </span>
+                            )}
                         </p>
                         {totalAlertPages > 1 && (
                             <p className="font-mono text-sm text-text-dim">
@@ -503,7 +634,17 @@ export default function RunDetail() {
                         )}
                     </div>
 
-                    {alertsData.data.length === 0 ? (
+                    {!alertsData ? (
+                        <div className="flex items-center justify-center py-10">
+                            <div
+                                className="w-5 h-5 border-2 rounded-full animate-spin"
+                                style={{
+                                    borderColor: "var(--border)",
+                                    borderTopColor: "var(--accent)",
+                                }}
+                            />
+                        </div>
+                    ) : alertsData.data.length === 0 ? (
                         <p className="font-mono text-sm text-text-dim text-center py-10">
                             {t("noAlertsFound")}
                         </p>
@@ -561,23 +702,15 @@ export default function RunDetail() {
                                                     <span
                                                         className="inline-flex px-2.5 py-1 rounded text-sm font-mono"
                                                         style={{
-                                                            color:
-                                                                a.severity === 1
-                                                                    ? "var(--danger)"
-                                                                    : a.severity ===
-                                                                        2
-                                                                      ? "var(--warn)"
-                                                                      : "var(--accent-2)",
-                                                            background: `color-mix(in srgb, ${a.severity === 1 ? "var(--danger)" : a.severity === 2 ? "var(--warn)" : "var(--accent-2)"} 12%, transparent)`,
-                                                            border: `1px solid color-mix(in srgb, ${a.severity === 1 ? "var(--danger)" : a.severity === 2 ? "var(--warn)" : "var(--accent-2)"} 25%, transparent)`,
+                                                            color: sevColor(
+                                                                a.severity,
+                                                            ),
+                                                            background: `color-mix(in srgb, ${sevColor(a.severity)} 12%, transparent)`,
+                                                            border: `1px solid color-mix(in srgb, ${sevColor(a.severity)} 25%, transparent)`,
                                                         }}
                                                     >
-                                                        {a.severity === 1
-                                                            ? "HIGH"
-                                                            : a.severity === 2
-                                                              ? "MED"
-                                                              : "LOW"}{" "}
-                                                        · {a.severity}
+                                                        {sevLabel(a.severity)} ·{" "}
+                                                        {a.severity}
                                                     </span>
                                                 </td>
                                                 <td className="px-5 py-3 font-mono text-sm text-text-dim">
@@ -592,6 +725,7 @@ export default function RunDetail() {
                                 </table>
                             </div>
 
+                            {/* Pagination */}
                             {totalAlertPages > 1 && (
                                 <div
                                     className="flex items-center justify-between px-5 py-3"
