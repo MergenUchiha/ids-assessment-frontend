@@ -28,6 +28,7 @@ import {
     Tooltip,
 } from "recharts";
 import { useState } from "react";
+import RunAnimation from "../components/RunAnimation";
 
 const ALERTS_PER_PAGE = 50;
 
@@ -106,7 +107,6 @@ export default function RunDetail() {
         queryFn: () => runsApi.report(runId!),
         refetchInterval: (q) => {
             const s = q.state.data?.status;
-            // Пока run активен — поллим каждые 3 секунды
             return s === "RUNNING" || s === "QUEUED" ? 3_000 : false;
         },
         enabled: !!runId,
@@ -116,7 +116,6 @@ export default function RunDetail() {
     const { data: alertsData } = useQuery<PaginatedAlerts>({
         queryKey: ["run-alerts", runId, alertPage],
         queryFn: () => runsApi.alerts(runId!, alertPage, ALERTS_PER_PAGE),
-        // Показываем алерты и для FAILED — там тоже могут быть
         enabled: !!report && report.status !== "QUEUED",
         keepPreviousData: true,
     } as any);
@@ -260,6 +259,11 @@ export default function RunDetail() {
                 </div>
             )}
 
+            {/* ── LIVE ATTACK ANIMATION ── */}
+            <div className="mb-5">
+                <RunAnimation report={report} />
+            </div>
+
             {/* ── Info cards: scenario / profile / time ── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                 <InfoCard
@@ -357,7 +361,6 @@ export default function RunDetail() {
                         </Panel>
                     </>
                 ) : (
-                    // Заглушки пока нет метрик
                     Array.from({ length: 3 }).map((_, i) => (
                         <Panel key={i} className="p-4">
                             <p className="font-mono text-xs uppercase tracking-widest text-text-dim mb-2">
@@ -612,7 +615,6 @@ export default function RunDetail() {
             </div>
 
             {/* ── Alerts table ── */}
-            {/* Показываем если есть данные ИЛИ run завершён */}
             {(alertsData || report.status === "FINISHED") && (
                 <Panel>
                     <div
