@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import type { RunReport, AttackEvent } from "../types";
+import { deriveScores } from "../types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Packet {
@@ -202,7 +203,7 @@ function useAnimationCanvas(
     );
 
     const drawPacket = useCallback(
-        (ctx: CanvasRenderingContext2D, packet: Packet, time: number) => {
+        (ctx: CanvasRenderingContext2D, packet: Packet) => {
             const t = easeInOut(packet.progress);
             const x = lerp(packet.fromX, packet.toX, t);
             const y = lerp(packet.fromY, packet.toY, t);
@@ -398,7 +399,7 @@ function useAnimationCanvas(
                 if (p.progress >= 1) {
                     pkts.splice(i, 1);
                 } else {
-                    drawPacket(ctx, p, time);
+                    drawPacket(ctx, p);
                 }
             }
 
@@ -462,6 +463,7 @@ function useAnimationCanvas(
             // Metrics overlay (bottom-right) if finished
             if (report?.metrics && report.status === "FINISHED") {
                 const m = report.metrics;
+                const d = deriveScores(m);
                 ctx.save();
                 ctx.font = "9px 'JetBrains Mono', monospace";
                 ctx.fillStyle = "#0d1117cc";
@@ -473,20 +475,20 @@ function useAnimationCanvas(
                 const lines = [
                     [
                         "F1",
-                        m.f1 != null ? `${(m.f1 * 100).toFixed(0)}%` : "—",
+                        d.f1 != null ? `${(d.f1 * 100).toFixed(0)}%` : "—",
                         "#a78bfa",
                     ],
                     [
                         "PREC",
-                        m.precision != null
-                            ? `${(m.precision * 100).toFixed(0)}%`
+                        d.precision != null
+                            ? `${(d.precision * 100).toFixed(0)}%`
                             : "—",
                         "#22d3a5",
                     ],
                     [
                         "RECALL",
-                        m.recall != null
-                            ? `${(m.recall * 100).toFixed(0)}%`
+                        d.recall != null
+                            ? `${(d.recall * 100).toFixed(0)}%`
                             : "—",
                         "#f97316",
                     ],

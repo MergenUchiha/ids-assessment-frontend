@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { experimentsApi, alertsApi } from "../api/client";
-import { Experiment, Run, Alert } from "../types";
+import { Experiment, Run, Alert, deriveScores } from "../types";
 import Panel from "../components/Panel";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
@@ -20,7 +20,6 @@ import {
     BarChart,
     Bar,
 } from "recharts";
-import { formatDistanceToNow } from "date-fns";
 
 const STATUS_COLOR: Record<string, string> = {
     FINISHED: "#22d3a5",
@@ -61,7 +60,20 @@ function StatCard({
     );
 }
 
-const ChartTip = ({ active, payload, label }: any) => {
+interface TipPayload {
+    name: string;
+    value: number;
+    color: string;
+}
+const ChartTip = ({
+    active,
+    payload,
+    label,
+}: {
+    active?: boolean;
+    payload?: TipPayload[];
+    label?: string;
+}) => {
     if (!active || !payload?.length) return null;
     return (
         <div
@@ -72,7 +84,7 @@ const ChartTip = ({ active, payload, label }: any) => {
             }}
         >
             <p className="text-text-dim mb-1">{label}</p>
-            {payload.map((p: any) => (
+            {payload.map((p) => (
                 <p key={p.name} style={{ color: p.color }}>
                     {p.name}: {p.value}%
                 </p>
@@ -100,10 +112,20 @@ export default function Dashboard() {
     const successes = finished.filter((r) => r.attackSuccess);
     const withMetrics = finished.filter((r) => r.metrics);
 
-    const avgF1 = withMetrics.length
-        ? withMetrics.reduce((s, r) => s + (r.metrics!.f1 ?? 0), 0) /
-          withMetrics.length
-        : 0;
+    // Summed confusion-matrix cells across finished runs give the meaningful
+    // aggregate — precision/recall/F1 are only defined over a set of runs, not
+    // one. This mirrors what GET /experiments/:id/summary returns.
+    const totals = withMetrics.reduce(
+        (acc, r) => ({
+            tp: acc.tp + r.metrics!.tp,
+            fp: acc.fp + r.metrics!.fp,
+            fn: acc.fn + r.metrics!.fn,
+            tn: acc.tn + r.metrics!.tn,
+        }),
+        { tp: 0, fp: 0, fn: 0, tn: 0 },
+    );
+    const overall = deriveScores(totals);
+    const avgF1 = overall.f1 ?? 0;
 
     const statusCounts: Record<string, number> = {};
     for (const r of allRuns)
@@ -113,14 +135,25 @@ export default function Dashboard() {
         value,
     }));
 
-    const metricsTimeline = withMetrics
-        .map((r, i) => ({
-            name: `R${i + 1}`,
-            Precision: +((r.metrics!.precision ?? 0) * 100).toFixed(1),
-            Recall: +((r.metrics!.recall ?? 0) * 100).toFixed(1),
-            F1: +((r.metrics!.f1 ?? 0) * 100).toFixed(1),
-        }))
-        .filter((d) => d.F1 > 0 || d.Precision > 0);
+    // A cumulative curve of the aggregate scores as runs accrue, which is the
+    // honest way to plot precision/recall/F1 over time — each point sums the
+    // cells of every run up to it.
+    const metricsTimeline = (() => {
+        const acc = { tp: 0, fp: 0, fn: 0, tn: 0 };
+        return withMetrics.map((r, i) => {
+            acc.tp += r.metrics!.tp;
+            acc.fp += r.metrics!.fp;
+            acc.fn += r.metrics!.fn;
+            acc.tn += r.metrics!.tn;
+            const sc = deriveScores(acc);
+            return {
+                name: `R${i + 1}`,
+                Precision: +((sc.precision ?? 0) * 100).toFixed(1),
+                Recall: +((sc.recall ?? 0) * 100).toFixed(1),
+                F1: +((sc.f1 ?? 0) * 100).toFixed(1),
+            };
+        });
+    })();
 
     const sigCount: Record<string, number> = {};
     for (const a of alerts)
@@ -503,8 +536,8 @@ export default function Dashboard() {
                                         className="py-3 pr-3 font-mono text-sm"
                                         style={{ color: "var(--accent)" }}
                                     >
-                                        {run.metrics?.f1 != null
-                                            ? `${(run.metrics.f1 * 100).toFixed(0)}%`
+                                        {run.metrics
+                                            ? `${((deriveScores(run.metrics).f1 ?? 0) * 100).toFixed(0)}%`
                                             : "—"}
                                     </td>
                                     <td

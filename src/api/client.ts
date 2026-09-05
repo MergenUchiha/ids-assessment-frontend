@@ -38,6 +38,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 import type {
     Experiment,
+    ExperimentSummary,
     Run,
     RunReport,
     PaginatedAlerts,
@@ -48,14 +49,9 @@ import type {
 
 // ─── All backend endpoints ─────────────────────────────────────────────────
 export const api = {
-    // Auth — POST /auth/login, POST /auth/register
+    // Auth — POST /auth/login
     login: (email: string, password: string) =>
         request<{ access_token: string }>("/auth/login", {
-            method: "POST",
-            body: JSON.stringify({ email, password }),
-        }),
-    register: (email: string, password: string) =>
-        request<{ access_token: string }>("/auth/register", {
             method: "POST",
             body: JSON.stringify({ email, password }),
         }),
@@ -63,6 +59,8 @@ export const api = {
     // Experiments — GET /experiments, GET /experiments/:id, POST /experiments, DELETE /experiments/:id
     getExperiments: () => request<Experiment[]>("/experiments"),
     getExperiment: (id: string) => request<Experiment>(`/experiments/${id}`),
+    getExperimentSummary: (id: string) =>
+        request<ExperimentSummary>(`/experiments/${id}/summary`),
     createExperiment: (name: string, description?: string) =>
         request<Experiment>("/experiments", {
             method: "POST",
@@ -110,17 +108,15 @@ export const api = {
 // ─── Named API groups ──────────────────────────────────────────────────────
 export const authApi = {
     login: (email: string, password: string) => api.login(email, password),
-    register: (email: string, password: string) =>
-        api.register(email, password),
 };
 
 export const experimentsApi = {
     list: () => api.getExperiments(),
     get: (id: string) => api.getExperiment(id),
+    summary: (id: string) => api.getExperimentSummary(id),
     create: (name: string, description?: string) =>
         api.createExperiment(name, description),
     delete: (id: string) => api.deleteExperiment(id),
-    remove: (id: string) => api.deleteExperiment(id),
 };
 
 export const runsApi = {
@@ -128,10 +124,7 @@ export const runsApi = {
         api.createRun(experimentId, scenarioId),
     get: (runId: string) => api.getRun(runId),
     report: (runId: string) => api.getRunReport(runId),
-    getReport: (runId: string) => api.getRunReport(runId),
     alerts: (runId: string, page = 1, limit = 50) =>
-        api.getRunAlerts(runId, page, limit),
-    getAlerts: (runId: string, page = 1, limit = 50) =>
         api.getRunAlerts(runId, page, limit),
 };
 
@@ -141,7 +134,6 @@ export const scenariosApi = {
     create: (data: Omit<Scenario, "id" | "createdAt">) =>
         api.createScenario(data),
     delete: (id: string) => api.deleteScenario(id),
-    remove: (id: string) => api.deleteScenario(id),
 };
 
 export const idsProfilesApi = {
@@ -149,7 +141,6 @@ export const idsProfilesApi = {
     create: (name: string, ruleset: string) =>
         api.createIdsProfile(name, ruleset),
     delete: (id: string) => api.deleteIdsProfile(id),
-    remove: (id: string) => api.deleteIdsProfile(id),
 };
 
 export const alertsApi = {

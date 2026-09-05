@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { runsApi } from "../api/client";
 import { RunReport, PaginatedAlerts } from "../types";
 import StatusBadge from "../components/StatusBadge";
@@ -28,6 +28,7 @@ import {
     Tooltip,
 } from "recharts";
 import { useState } from "react";
+import { deriveScores } from "../types";
 import RunAnimation from "../components/RunAnimation";
 
 const ALERTS_PER_PAGE = 50;
@@ -117,8 +118,10 @@ export default function RunDetail() {
         queryKey: ["run-alerts", runId, alertPage],
         queryFn: () => runsApi.alerts(runId!, alertPage, ALERTS_PER_PAGE),
         enabled: !!report && report.status !== "QUEUED",
-        keepPreviousData: true,
-    } as any);
+        // react-query v5 renamed `keepPreviousData`; the `as any` that used to
+        // wrap this object was hiding that the old key did nothing.
+        placeholderData: keepPreviousData,
+    });
 
     // ── Loading state ─────────────────────────────────────────────────────────
     if (isLoading) {
@@ -169,15 +172,19 @@ export default function RunDetail() {
 
     // ── Derived data ──────────────────────────────────────────────────────────
     const m = report.metrics;
+    // Per-run precision/recall/F1 are derived from the confusion-matrix cells:
+    // the backend no longer stores them, because over one run they are only
+    // ever 0 or 1.
+    const d = m ? deriveScores(m) : { precision: null, recall: null, f1: null };
 
     const radarData = m
         ? [
               {
                   metric: "Precision",
-                  value: Math.round((m.precision ?? 0) * 100),
+                  value: Math.round((d.precision ?? 0) * 100),
               },
-              { metric: "Recall", value: Math.round((m.recall ?? 0) * 100) },
-              { metric: "F1", value: Math.round((m.f1 ?? 0) * 100) },
+              { metric: "Recall", value: Math.round((d.recall ?? 0) * 100) },
+              { metric: "F1", value: Math.round((d.f1 ?? 0) * 100) },
           ]
         : [];
 
@@ -343,8 +350,8 @@ export default function RunDetail() {
                                 className="font-mono text-3xl font-bold"
                                 style={{ color: "var(--accent)" }}
                             >
-                                {m.f1 != null
-                                    ? `${(m.f1 * 100).toFixed(1)}%`
+                                {d.f1 != null
+                                    ? `${(d.f1 * 100).toFixed(1)}%`
                                     : "—"}
                             </p>
                         </Panel>
@@ -440,8 +447,8 @@ export default function RunDetail() {
                             <MetricRow
                                 label={t("precision")}
                                 value={
-                                    m.precision != null
-                                        ? `${(m.precision * 100).toFixed(1)}%`
+                                    d.precision != null
+                                        ? `${(d.precision * 100).toFixed(1)}%`
                                         : "—"
                                 }
                                 color="var(--accent)"
@@ -449,8 +456,8 @@ export default function RunDetail() {
                             <MetricRow
                                 label={t("recall")}
                                 value={
-                                    m.recall != null
-                                        ? `${(m.recall * 100).toFixed(1)}%`
+                                    d.recall != null
+                                        ? `${(d.recall * 100).toFixed(1)}%`
                                         : "—"
                                 }
                                 color="var(--accent)"
@@ -458,8 +465,8 @@ export default function RunDetail() {
                             <MetricRow
                                 label={t("f1Score")}
                                 value={
-                                    m.f1 != null
-                                        ? `${(m.f1 * 100).toFixed(1)}%`
+                                    d.f1 != null
+                                        ? `${(d.f1 * 100).toFixed(1)}%`
                                         : "—"
                                 }
                                 color="var(--accent)"
@@ -510,7 +517,7 @@ export default function RunDetail() {
                                     strokeWidth={2}
                                 />
                                 <Tooltip
-                                    formatter={(v: any) => [`${v}%`, ""]}
+                                    formatter={(v) => [`${v}%`, ""] as [string, string]}
                                     contentStyle={{
                                         background: "var(--bg-2)",
                                         border: "1px solid var(--border)",
