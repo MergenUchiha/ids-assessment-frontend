@@ -24,7 +24,7 @@ export default function Btn({
                 variant === "ghost" &&
                     "border border-border text-text-dim hover:border-border-bright hover:text-text bg-transparent",
                 variant === "danger" &&
-                    "border border-danger\/40 text-danger hover:bg-danger\/10",
+                    "border border-danger/40 text-danger hover:bg-danger/10",
                 className,
             )}
             {...props}
