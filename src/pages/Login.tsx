@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useI18n, type Lang } from "../i18n";
 import { useTheme } from "../contexts/ThemeContext";
-import { Shield, Lock, Mail, Sun, Moon, UserPlus, LogIn } from "lucide-react";
+import { Shield, Lock, Mail, Sun, Moon } from "lucide-react";
 
 const LANGS: { code: Lang; label: string }[] = [
     { code: "en", label: "EN" },
@@ -13,10 +13,9 @@ const LANGS: { code: Lang; label: string }[] = [
 
 export default function Login() {
     const navigate = useNavigate();
-    const { login, register } = useAuth();
+    const { login } = useAuth();
     const { t, lang, setLang } = useI18n();
     const { theme, toggleTheme } = useTheme();
-    const [mode, setMode] = useState<"login" | "register">("login");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [err, setErr] = useState("");
@@ -27,13 +26,10 @@ export default function Login() {
         setErr("");
         setLoading(true);
         try {
-            if (mode === "login") await login(email, password);
-            else await register(email, password);
+            await login(email, password);
             navigate("/");
-        } catch (error: any) {
-            const msg = String(error?.message ?? "");
-            if (msg.includes("already exists")) setErr("User already exists");
-            else setErr(t("invalidCreds"));
+        } catch {
+            setErr(t("invalidCreds"));
         } finally {
             setLoading(false);
         }
@@ -131,50 +127,11 @@ export default function Login() {
                         border: "1px solid var(--border)",
                     }}
                 >
-                    {/* Mode switcher */}
-                    <div
-                        className="flex rounded-lg overflow-hidden mb-6"
-                        style={{ border: "1px solid var(--border)" }}
-                    >
-                        {(["login", "register"] as const).map((m) => (
-                            <button
-                                key={m}
-                                onClick={() => {
-                                    setMode(m);
-                                    setErr("");
-                                }}
-                                className="flex-1 flex items-center justify-center gap-2 py-2.5 font-mono text-sm uppercase tracking-wide transition-all"
-                                style={{
-                                    background:
-                                        mode === m
-                                            ? "color-mix(in srgb, var(--accent) 15%, transparent)"
-                                            : "transparent",
-                                    color:
-                                        mode === m
-                                            ? "var(--accent)"
-                                            : "var(--text-dim)",
-                                    borderRight:
-                                        m === "login"
-                                            ? "1px solid var(--border)"
-                                            : undefined,
-                                }}
-                            >
-                                {m === "login" ? (
-                                    <LogIn size={13} />
-                                ) : (
-                                    <UserPlus size={13} />
-                                )}
-                                {m === "login" ? t("login") : "Register"}
-                            </button>
-                        ))}
-                    </div>
-
                     <p
                         className="font-mono text-sm uppercase tracking-widest mb-5"
                         style={{ color: "var(--accent)" }}
                     >
-                        //{" "}
-                        {mode === "login" ? "authenticate" : "create account"}
+                        // authenticate
                     </p>
 
                     <form onSubmit={submit} className="space-y-4">
@@ -194,7 +151,7 @@ export default function Login() {
                                     required
                                     className="w-full rounded-lg px-3 py-3 pl-9 font-mono focus:outline-none transition-colors"
                                     style={inputSt}
-                                    placeholder="admin@test.com"
+                                    placeholder="admin@ids.local"
                                 />
                             </div>
                         </div>
@@ -220,11 +177,6 @@ export default function Login() {
                                     placeholder="••••••••"
                                 />
                             </div>
-                            {mode === "register" && (
-                                <p className="font-mono text-xs text-text-dim mt-1">
-                                    Minimum 6 characters
-                                </p>
-                            )}
                         </div>
 
                         {err && (
@@ -250,11 +202,7 @@ export default function Login() {
                                 color: "var(--bg)",
                             }}
                         >
-                            {loading
-                                ? t("authenticating")
-                                : mode === "login"
-                                  ? t("login")
-                                  : "Register"}
+                            {loading ? t("authenticating") : t("login")}
                         </button>
                     </form>
                 </div>
